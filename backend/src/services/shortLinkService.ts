@@ -1,6 +1,6 @@
-import { prisma } from '../prisma/client';
 import redis from './redis';
 import { generateShortCode } from '../utils/generateCode';
+import { ShortLinkRepository } from '../repositories/shortLinkRepository';
 
 // Интерфейс для создания ссылки
 export interface CreateShortLinkInput {
@@ -31,9 +31,7 @@ export class ShortLinkService {
     while (!isUnique) {
       shortCode = generateShortCode(6);
 
-      const existing = await prisma.shortLink.findUnique({
-        where: { shortCode },
-      });
+      const existing = await ShortLinkRepository.findByCode(shortCode);
 
       if (!existing) {
         isUnique = true;
@@ -41,15 +39,15 @@ export class ShortLinkService {
     }
 
     // Создаём запись в БД
-    const shortLink = await prisma.shortLink.create({
-      data: {
-        shortCode: shortCode!,
-        originalUrl: input.originalUrl,
-        clicks: 0,
-      },
-    });
+    const shortLink = await ShortLinkRepository.create(shortCode!, input.originalUrl);
 
-    const shortUrl = `http://localhost:3001/${shortLink.shortCode}`;
+    const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+
+    if (!appUrl) {
+      throw new Error('APP_URL не задан');
+    }
+
+    const shortUrl = `${appUrl}/${shortLink.shortCode}`;
 
     return {
       shortCode: shortLink.shortCode,
@@ -59,9 +57,7 @@ export class ShortLinkService {
 
   // Получить статистику
   static async getStats(shortCode: string): Promise<ShortLinkStats | null> {
-    const shortLink = await prisma.shortLink.findUnique({
-      where: { shortCode },
-    });
+    const shortLink = await ShortLinkRepository.findByCode(shortCode);
 
     if (!shortLink) {
       return null;
@@ -87,17 +83,12 @@ export class ShortLinkService {
     }
 
     if (cachedUrl) {
-      prisma.shortLink.update({
-        where: { shortCode },
-        data: { clicks: { increment: 1 } },
-      }).catch(err => console.error('Ошибка обновления clicks:', err));
+      await ShortLinkRepository.incrementClicks(shortCode);
       return cachedUrl;
     }
 
     // Если в кэше нет (или Redis упал), идем в БД
-    const shortLink = await prisma.shortLink.findUnique({
-      where: { shortCode },
-    });
+    const shortLink = await ShortLinkRepository.findByCode(shortCode);
 
     if (!shortLink) {
       return null;
@@ -110,10 +101,7 @@ export class ShortLinkService {
       console.warn('Не удалось сохранить в Redis:', redisError);
     }
 
-    await prisma.shortLink.update({
-      where: { shortCode },
-      data: { clicks: { increment: 1 } },
-    });
+    await ShortLinkRepository.incrementClicks(shortCode);
 
     return shortLink.originalUrl;
   }

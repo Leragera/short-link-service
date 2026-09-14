@@ -8,4 +8,26 @@ const apiClient = axios.create({
   },
 });
 
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const serverMessage = error.response?.data?.error;
+
+    if (typeof serverMessage === 'string') {
+      return serverMessage;
+    }
+
+    if (error.response?.status) {
+      return `${fallback} (код ${error.response.status})`;
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      return 'Сервер не ответил вовремя';
+    }
+
+    return 'Не удалось связаться с сервером';
+  }
+
+  return fallback;
+}
+
 export default apiClient;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import apiClient from '../api/client.ts';
+import apiClient, { getApiErrorMessage } from '../api/client.ts';
 import toast from 'react-hot-toast';
 
 interface Stats {
@@ -29,11 +29,7 @@ export default function StatsForm() {
       setStats(response.data);
       toast.success('Статистика получена!');
     } catch (error) {
-  const message = 
-    error instanceof Error 
-      ? error.message 
-      : 'Ошибка при получении статистики';
-      toast.error(message);
+      toast.error(getApiErrorMessage(error, 'Ошибка при получении статистики'));
       setStats(null);
     } finally {
       setLoading(false);

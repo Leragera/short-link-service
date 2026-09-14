@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import apiClient from '../api/client.ts';
+import apiClient, { getApiErrorMessage } from '../api/client.ts';
 import toast from 'react-hot-toast';
+import { isValidHttpUrl } from '../utils/validation.ts';
 
 export default function ShortenForm() {
   const [url, setUrl] = useState('');
@@ -10,8 +11,15 @@ export default function ShortenForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!url.trim()) {
+    const normalizedUrl = url.trim();
+
+    if (!normalizedUrl) {
       toast.error('Введите URL');
+      return;
+    }
+
+    if (!isValidHttpUrl(normalizedUrl)) {
+      toast.error('Введите корректный URL, начинающийся с http:// или https://');
       return;
     }
 
@@ -19,27 +27,29 @@ export default function ShortenForm() {
 
     try {
       const response = await apiClient.post('/api/shorten', {
-        originalUrl: url,
+        originalUrl: normalizedUrl,
       });
 
       setResult(response.data);
       toast.success('Ссылка создана!');
       setUrl('');
     } catch (error) {
-  const message = 
-    error instanceof Error 
-      ? error.message 
-      : 'Ошибка при создании ссылки';
-      toast.error(message);
+      toast.error(getApiErrorMessage(error, 'Ошибка при создании ссылки'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = () => {
-    if (result) {
-      navigator.clipboard.writeText(result.shortUrl);
+  const handleCopy = async () => {
+    if (!result) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(result.shortUrl);
       toast.success('Скопировано!');
+    } catch {
+      toast.error('Не удалось скопировать ссылку');
     }
   };
 
@@ -49,7 +59,7 @@ export default function ShortenForm() {
 
       <form onSubmit={handleSubmit}>
         <input
-          type="text"
+          type="url"
           placeholder="Введите длинный URL (https://...)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}

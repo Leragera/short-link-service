@@ -1,75 +1,188 @@
-# Сервис сокращения ссылок (URL Shortener)
+# Сервис сокращения ссылок
 
-Полноценное веб-приложение для создания коротких ссылок с отслеживанием статистики переходов, кэшированием и современным пользовательским интерфейсом.
+Веб-приложение для создания коротких ссылок, редиректов и просмотра статистики переходов.
 
-## Инструкция по установке и запуску
+## Технологии
 
-# Требования
-Node.js 20 или новее
-npm
-Docker Desktop с поддержкой Docker Compose
+### Backend
 
-# Локальный запуск
-Запустите PostgreSQL и Redis из корня проекта:
+- Node.js 20+
+- TypeScript
+- Express
+- Prisma ORM
+- PostgreSQL
+- Redis
+- Zod
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+- Axios
+- React Hot Toast
+- CSS3 с адаптивной версткой
+
+### Инфраструктура
+
+- Docker и Docker Compose
+- Nginx
+
+## Установка и запуск через Docker
+
+Требования: Docker Desktop с поддержкой Docker Compose.
+
+Из корня проекта выполните:
+
+```powershell
+cd C:\Users\gva09\my-app
+docker compose up -d --build
+```
+
+Команда запускает PostgreSQL, Redis, backend и frontend. Backend ожидает готовности PostgreSQL и Redis, а затем автоматически выполняет Prisma-миграции.
+
+После запуска:
+
+- frontend: http://localhost
+- backend health check: http://localhost:3001/api/health
+
+Проверить состояние контейнеров:
+
+```powershell
+docker compose ps
+```
+
+Посмотреть логи backend:
+
+```powershell
+docker compose logs -f backend
+```
+
+Остановить приложение:
+
+```powershell
+docker compose down
+```
+
+## Локальный запуск в режиме разработки
+
+Запустите PostgreSQL и Redis:
+
+```powershell
 docker compose up -d postgres redis
+```
 
-Настройте backend:
+В отдельном терминале установите и запустите backend:
+
+```powershell
 cd backend
 copy .env.example .env
 npm install
 npx prisma migrate deploy
 npm run dev
+```
 
-В отдельном терминале настройте frontend:
+В другом терминале установите и запустите frontend:
+
+```powershell
 cd frontend
 copy .env.example .env
 npm install
 npm run dev
+```
 
-# Запуск через Docker Compose
-Для запуска всего приложения выполните из корня проекта:
-docker compose up -d --build postgres redis
+Frontend будет доступен по адресу, который выведет Vite, обычно http://localhost:5173.
 
-Примените миграции базы данных:
-docker compose run --rm backend npx prisma migrate deploy
+## API
 
-Запустите backend и frontend:
-docker compose up -d --build backend frontend
+### Проверка состояния backend
 
-## Стек технологий
+```bash
+curl http://localhost:3001/api/health
+```
 
-- **TypeScript** — строгая типизация
-- **Prisma ORM** — работа с базой данных и миграции
-- **Zod** — валидация входящих данных
-- **PostgreSQL** — основная реляционная база данных
-- **Redis** — кэширование для ускорения редиректов (TTL 1 час)
+Ожидаемый ответ:
 
-### Frontend
-- **React** + **TypeScript** — библиотека для создания интерфейса
-- **Vite** — быстрый сборщик и dev-сервер
-- **Axios** — HTTP-клиент для запросов к API
-- **React Hot Toast** — система уведомлений
-- **CSS3** — кастомная стилизация с адаптивным дизайном
+```json
+{"status":"OK","message":"Backend работает!"}
+```
 
-### Инфраструктура
-- **Docker** + **Docker Compose** — контейнеризация всех сервисов
-- **Nginx** — раздача статических файлов фронтенда и проксирование API-запросов
+### Создание короткой ссылки
 
----
+```bash
+curl -X POST http://localhost:3001/api/shorten \
+	-H "Content-Type: application/json" \
+	-d '{"originalUrl":"https://example.com"}'
+```
+
+Пример ответа:
+
+```json
+{
+	"shortCode": "abc123",
+	"shortUrl": "http://localhost:3001/abc123"
+}
+```
+
+В PowerShell используйте `curl.exe`, если команда `curl` перенаправлена на `Invoke-WebRequest`:
+
+```powershell
+curl.exe -X POST http://localhost:3001/api/shorten `
+	-H "Content-Type: application/json" `
+	-d '{"originalUrl":"https://example.com"}'
+```
+
+### Переход по короткой ссылке
+
+Откройте URL из ответа в браузере или выполните:
+
+```bash
+curl -i http://localhost:3001/abc123
+```
+
+Успешный запрос возвращает HTTP 302 и перенаправляет на исходный URL.
+
+### Получение статистики
+
+```bash
+curl http://localhost:3001/api/stats/abc123
+```
+
+Пример ответа:
+
+```json
+{
+	"originalUrl": "https://example.com",
+	"shortCode": "abc123",
+	"clicks": 1,
+	"createdAt": "2026-09-14T12:00:00.000Z"
+}
+```
 
 ## Переменные окружения
 
-Для работы приложения необходимо создать файлы `.env` на основе `.env.example`.
+Скопируйте соответствующий `.env.example` в `.env`. Файлы `.env` не должны добавляться в Git.
 
-### Backend (`backend/.env`)
+### Backend: `backend/.env`
+
 ```env
-# Порт сервера
 PORT=3001
-# Окружение (development, production)
 NODE_ENV=development
-# Строка подключения к PostgreSQL (для Docker используйте имя сервиса 'postgres' вместо 'localhost')
 DATABASE_URL="postgresql://dev_user:dev_password@localhost:5432/app_db?schema=public"
-# Строка подключения к Redis
 REDIS_URL="redis://localhost:6379"
-# Базовый URL приложения (для генерации коротких ссылок)
 APP_URL="http://localhost:3001"
+```
+
+Для запуска backend внутри Docker используются имена сервисов Compose:
+
+```env
+DATABASE_URL="postgresql://dev_user:dev_password@postgres:5432/app_db?schema=public"
+REDIS_URL="redis://redis:6379"
+APP_URL="http://localhost:3001"
+```
+
+### Frontend: `frontend/.env`
+
+```env
+VITE_API_URL="http://localhost:3001"
+```

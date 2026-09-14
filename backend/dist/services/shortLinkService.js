@@ -4,9 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ShortLinkService = void 0;
-const client_1 = require("../prisma/client");
 const redis_1 = __importDefault(require("./redis"));
 const generateCode_1 = require("../utils/generateCode");
+const shortLinkRepository_1 = require("../repositories/shortLinkRepository");
 class ShortLinkService {
     // Создать короткую ссылку
     static async create(input) {
@@ -15,22 +15,18 @@ class ShortLinkService {
         let isUnique = false;
         while (!isUnique) {
             shortCode = (0, generateCode_1.generateShortCode)(6);
-            const existing = await client_1.prisma.shortLink.findUnique({
-                where: { shortCode },
-            });
+            const existing = await shortLinkRepository_1.ShortLinkRepository.findByCode(shortCode);
             if (!existing) {
                 isUnique = true;
             }
         }
         // Создаём запись в БД
-        const shortLink = await client_1.prisma.shortLink.create({
-            data: {
-                shortCode: shortCode,
-                originalUrl: input.originalUrl,
-                clicks: 0,
-            },
-        });
-        const shortUrl = `http://localhost:3001/${shortLink.shortCode}`;
+        const shortLink = await shortLinkRepository_1.ShortLinkRepository.create(shortCode, input.originalUrl);
+        const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+        if (!appUrl) {
+            throw new Error('APP_URL не задан');
+        }
+        const shortUrl = `${appUrl}/${shortLink.shortCode}`;
         return {
             shortCode: shortLink.shortCode,
             shortUrl,
@@ -38,9 +34,7 @@ class ShortLinkService {
     }
     // Получить статистику
     static async getStats(shortCode) {
-        const shortLink = await client_1.prisma.shortLink.findUnique({
-            where: { shortCode },
-        });
+        const shortLink = await shortLinkRepository_1.ShortLinkRepository.findByCode(shortCode);
         if (!shortLink) {
             return null;
         }
@@ -53,30 +47,31 @@ class ShortLinkService {
     }
     // Обработать редирект
     static async handleRedirect(shortCode) {
-        // Проверяем кэш Redis
-        const cachedUrl = await redis_1.default.get(`shortlink:${shortCode}`);
+        let cachedUrl = null;
+        // Пытаемся получить из Redis, но не ломаем приложение, если он упал
+        try {
+            cachedUrl = await redis_1.default.get(`shortlink:${shortCode}`);
+        }
+        catch (redisError) {
+            console.warn('Redis недоступен, переходим к PostgreSQL:', redisError);
+        }
         if (cachedUrl) {
-            // Увеличиваем счётчик в фоне
-            client_1.prisma.shortLink.update({
-                where: { shortCode },
-                data: { clicks: { increment: 1 } },
-            }).catch(err => console.error('Ошибка обновления clicks:', err));
+            await shortLinkRepository_1.ShortLinkRepository.incrementClicks(shortCode);
             return cachedUrl;
         }
-        // Ищем в БД
-        const shortLink = await client_1.prisma.shortLink.findUnique({
-            where: { shortCode },
-        });
+        // Если в кэше нет (или Redis упал), идем в БД
+        const shortLink = await shortLinkRepository_1.ShortLinkRepository.findByCode(shortCode);
         if (!shortLink) {
             return null;
         }
-        // Сохраняем в кэш на 1 час
-        await redis_1.default.setex(`shortlink:${shortCode}`, 3600, shortLink.originalUrl);
-        // Увеличиваем счётчик
-        await client_1.prisma.shortLink.update({
-            where: { shortCode },
-            data: { clicks: { increment: 1 } },
-        });
+        // Пытаемся сохранить в кэш, но игнорируем ошибки, если Redis недоступен
+        try {
+            await redis_1.default.setex(`shortlink:${shortCode}`, 3600, shortLink.originalUrl);
+        }
+        catch (redisError) {
+            console.warn('Не удалось сохранить в Redis:', redisError);
+        }
+        await shortLinkRepository_1.ShortLinkRepository.incrementClicks(shortCode);
         return shortLink.originalUrl;
     }
 }
