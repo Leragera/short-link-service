@@ -28,10 +28,9 @@ export class ShortLinkController {
   }
 
   // GET /:shortCode
-  static async redirect(req: Request, res: Response): Promise<void> {
+  static async redirect(req: Request<{ shortCode: string }>, res: Response): Promise<void> {
     try {
-      // Явно указываем тип string
-      const shortCode: string = req.params.shortCode as string;
+      const { shortCode } = req.params;
 
       const originalUrl = await ShortLinkService.handleRedirect(shortCode);
 
@@ -48,10 +47,9 @@ export class ShortLinkController {
   }
 
   // GET /api/stats/:shortCode
-  static async getStats(req: Request, res: Response): Promise<void> {
+  static async getStats(req: Request<{ shortCode: string }>, res: Response): Promise<void> {
     try {
-      // Явно указываем тип string
-      const shortCode: string = req.params.shortCode as string;
+      const { shortCode } = req.params;
 
       const stats = await ShortLinkService.getStats(shortCode);
 

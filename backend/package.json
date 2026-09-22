@@ -6,12 +6,22 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "tsx --test src/tests/*.test.ts",
+    "test": "jest --runInBand",
     "start": "node dist/index.js",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "postinstall": "prisma generate"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/src/tests/setup.ts"],
+    "testMatch": ["<rootDir>/src/tests/**/*.test.ts"],
+    "testPathIgnorePatterns": ["<rootDir>/dist/"],
+    "transform": {
+      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": { "module": "CommonJS" } }]
+    }
   },
   "keywords": [],
   "author": "",
@@ -24,15 +34,20 @@
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "ioredis": "^6.0.0",
+    "morgan": "^1.12.1",
     "prisma": "^5.22.0",
     "zod": "^4.6.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^22.20.2",
     "@types/supertest": "^7.2.1",
+    "jest": "^30.5.2",
     "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }

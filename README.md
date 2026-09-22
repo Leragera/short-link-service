@@ -35,7 +35,7 @@
 Из корня проекта выполните:
 
 ```powershell
-cd C:\Users\gva09\my-app
+cd КОРЕНЬ ПРОЕКТА
 docker compose up -d --build
 ```
 

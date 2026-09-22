@@ -5,8 +5,10 @@ export const shortenUrlSchema = z.object({
   originalUrl: z
     .string()
     .url('Некорректный URL')
-    .startsWith('http://', 'URL должен начинаться с http://')
-    .or(z.string().url().startsWith('https://', 'URL должен начинаться с https://'))
+    .refine(
+      (value) => ['http:', 'https:'].includes(new URL(value).protocol),
+      'URL должен начинаться с http:// или https://',
+    )
     .refine((value) => {
       const appUrl = process.env.APP_URL;
 
@@ -14,7 +16,11 @@ export const shortenUrlSchema = z.object({
         return true;
       }
 
-      return new URL(value).origin !== new URL(appUrl).origin;
+      try {
+        return new URL(value).origin !== new URL(appUrl).origin;
+      } catch {
+        return true;
+      }
     }, 'Нельзя создать ссылку на этот сервис'),
 });
 
