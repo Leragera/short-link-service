@@ -7,7 +7,6 @@ const router = Router();
 router.post('/shorten', ShortLinkController.create);
 
 // GET /api/stats/:shortCode — получить статистику
-// ВАЖНО: этот роут должен быть ДО роута с редиректом!
 router.get('/stats/:shortCode', ShortLinkController.getStats);
 
 export default router;
